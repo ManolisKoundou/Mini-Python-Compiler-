@@ -1,0 +1,242 @@
+Package minipython;
+
+Helpers
+	digit = ['0' .. '9'];
+	letter = ['a' .. 'z']|['A' .. 'Z']; 
+	cr = 13; 
+	lf = 10;
+	all = [0..127]; 
+	eol = lf | cr | cr lf ;
+	not_eol = [all - [cr + lf]];
+	comment_start = 35;
+	dot = 46;
+
+Tokens
+	tab = 9;
+	plus = '+';
+	minus = '-';
+	mult = '*';
+	dmult = '**';
+	div = '/';
+	mod = '%';
+	eq = '=';
+	minus_eq = '-=';
+	div_eq = '/=';
+	exclam = '!';
+	dictt = 'dict';
+	define = 'def';
+	logic_plus = '&&';
+	l_par = '(';
+	r_par = ')';
+	l_br = '[';
+	r_br = ']';
+	comma = ',';
+	d_o_t = dot;
+	qmark = '?';
+	gqmark = ';';
+	open = 'open';
+	type = 'type';
+	not = 'not';
+	and = 'and';
+	or = 'or';
+	if = 'if';
+	elif = 'elif';
+	else = 'else';
+	assert = 'assert';
+	while = 'while';
+	for = 'for';
+	in = 'in';
+	print = 'print';
+	return = 'return';
+	max = 'max';
+	min = 'min';
+	less = '<';
+	less_eq = '<=';
+	great = '>';
+	great_eq = '>=';
+	not_eq = '!=';
+	equals = '==';
+	false = 'false';
+	true = 'true';
+	semi = ':';
+	quote = '"';
+	none = 'None';
+	blank = (' ' | lf | cr);
+	line_comment = comment_start not_eol* eol;
+	integer = digit+;
+	float = digit+ dot digit+;
+	id = letter (letter | digit)*;
+	string = '"'not_eol* '"';
+	string_simple = '''not_eol* ''';
+
+Ignored Tokens
+	blank, line_comment;
+
+Productions
+    programme = {cmds} commands*{-> New programme.cmds([commands])};
+
+    commands =  {func} function{-> New commands.func(function)} |
+                {stat} statement{-> New commands.stat(statement)};
+
+    function =  {func}define identifier l_par argument? r_par semi statement{-> New function.func(identifier, [argument], statement)};
+
+    argument =  {arg}identifier assign? more_arguments*{-> New argument.arg(identifier, [assign], [more_arguments])};
+
+    more_arguments = {args}comma identifier assign?{-> New more_arguments.args(identifier, [assign])};
+
+    assign = {ass}eq value{-> New assign.ass(value)};
+
+    statement = {if} tab* if  comparison semi statement{-> New statement.if(comparison, statement)} |
+                {while} tab* while comparison semi statement{-> New statement.while(comparison, statement)} |
+                {for} tab* for [id1]:identifier in [id2]:identifier semi statement{-> New statement.for(id1, id2, statement)} |
+                {return} tab* return expression{-> New statement.return(expression)} |
+                {print} tab* print expression next_expression*{-> New statement.print(expression, [next_expression])} |
+                {asnm} tab* identifier eq_types expression{-> New statement.asnm(identifier, expression)} |
+                {table} tab* identifier l_br [exp1]:expression r_br eq [exp2]:expression{-> New statement.table(identifier, exp1, exp2)} |
+                {asrt} tab* assert expression next_expression?{-> New statement.asrt(expression, [next_expression])} |
+                {sfcall} tab* function_call{-> New statement.sfcall(function_call)};
+
+    eq_types{-> } =  {equal}eq{-> } |
+                     {reduce}minus_eq{-> } |
+                     {divide}div_eq{-> };
+
+
+   comparison = {comp1} comparison1{-> comparison1.comparison} |  //υποσυνολο.υπερσυνολο
+                    {ctrue} true{-> New comparison.ctrue(true)} |
+                    {cfalse} false{-> New comparison.cfalse(false)};
+
+   comparison1{-> comparison} = {comp2} comparison2{-> comparison2.comparison} |
+                 {not} not comparison2{-> New comparison.not(comparison2.comparison)};
+
+   comparison2{-> comparison} = {comp3} comparison3{-> comparison3.comparison} |
+                 {and} [c1]:comparison3 and [c2]:comparison3{-> New comparison.and(c1.comparison, c2.comparison)};
+
+   comparison3{-> comparison} = {comp4} comparison4{-> comparison4.comparison} |
+                 {or} [c1]:comparison4 or [c2]:comparison4{-> New comparison.or(c1.comparison, c2.comparison)};
+
+   comparison4{-> comparison} = {comp_exp} [exp1]:expression comp_ops [exp2]:expression{-> New comparison.comp_exp(exp1, exp2)};
+
+   comp_ops{-> } = {great} great{-> } |
+              {less} less{-> } |
+              {great_eq} great_eq{-> } |
+              {less_eq} less_eq{-> } |
+              {just_eq} equals{-> } |
+              {not_eq} not_eq{-> };
+
+   expression = {exp1} expression1{-> expression1.expression} |
+                {plus} expression1 plus expression{-> New expression.plus(expression1.expression, expression)} |
+                {minus} expression1 minus expression{-> New expression.minus(expression1.expression, expression)};
+
+   expression1{-> expression} = {exp2}expression2{-> expression2.expression} |
+                  {mult} expression1 mult expression2{-> New expression.mult(expression1.expression, expression2.expression)} |
+                  {div} expression1 div expression2{-> New expression.div(expression1.expression, expression2.expression)} |
+                  {mod} expression1 mod expression2{-> New expression.mod(expression1.expression, expression2.expression)};
+
+   expression2{-> expression} = {exp3} expression3{-> expression3.expression} |
+                 {power} expression2 dmult expression3{-> New expression.power(expression2.expression, expression3.expression)};
+
+   expression3{-> expression} = {exp4}expression4{-> expression4.expression} |
+                 {val} value{-> New expression.val(value)} |
+                 {max} max l_par value next_value+ r_par{-> New expression.max(value, [next_value])} |
+                 {min} min l_par value next_value+ r_par{-> New expression.min(value, [next_value])};
+
+   expression4{-> expression} = {exp5} expression5{-> expression5.expression} |
+                 {subscription} identifier l_br expression r_br{-> New expression.subscription(identifier, expression)};
+
+   expression5{-> expression} = {exp6} expression6{-> expression6.expression} |
+                 {br_exps} l_br expression next_expression* r_br{-> New expression.br_exps(expression, [next_expression])};
+
+   expression6{-> expression} = {type} type l_par expression7 r_par{-> New expression.type(expression7.expression)}|
+                 {exp7} expression7{-> expression7.expression};
+
+   expression7{-> expression} =  {exp8} expression8{-> expression8.expression} |
+                  {exp_par} l_par expression r_par{-> New expression.exp_par(expression)} |
+                  {exp_fc} function_call{-> New expression.exp_fc(function_call)}  |
+                  {open} open l_par [txt1]:expression8 comma [txt2]:expression8 r_par{-> New expression.open(txt1.expression, txt2.expression)};
+
+   expression8{-> expression} = {var} identifier{-> New expression.var(identifier)};
+
+    next_value = {nextv}comma value{-> New next_value.nextv(value)};
+
+    value = {val} identifier d_o_t function_call{-> New value.val(identifier, function_call)} |
+            {num} number{-> New value.num(number)} |
+            {str1} string{-> New value.str1(string)} |
+            {str2} string_simple{-> New value.str2(string_simple)} |
+            {non} none{-> New value.non(none)};
+
+    number = {int}integer{-> New number.int(integer)};
+
+    function_call = {fc}identifier l_par arglist? r_par{-> New function_call.fc(identifier, [arglist])};
+
+    arglist = {argl}expression next_expression*{-> New arglist.argl(expression, [next_expression])};
+
+    next_expression = {nexte}comma expression{-> New next_expression.nexte(expression)};
+
+    identifier = {idr}id{-> New identifier.idr(id)};
+
+Abstract Syntax Tree
+
+    programme = {cmds} commands*;
+
+    commands = {func} function |
+               {stat} statement;
+
+    function = {func}identifier argument* statement;
+
+    argument = {arg}identifier assign* more_arguments*;
+
+    more_arguments = {args}identifier assign*;
+
+    assign = {ass}value;
+
+    statement = {if} comparison statement |
+                {while} comparison statement |
+                {for} [id1]:identifier [id2]:identifier statement |
+                {return} expression |
+                {print} expression next_expression* |
+                {asnm} identifier expression |
+                {table} identifier [exp1]:expression [exp2]:expression |
+                {asrt} expression next_expression* |
+                {sfcall} function_call;
+
+    comparison = {ctrue} true |
+                 {cfalse} false |
+                 {not} comparison |
+                 {and} [c1]:comparison [c2]:comparison |
+                 {or} [c1]:comparison [c2]:comparison |
+                 {comp_exp} [exp1]:expression [exp2]:expression;
+
+    expression = {plus} [l]:expression [r]:expression |
+                 {minus} [l]:expression [r]:expression |
+                 {mult} [l]:expression [r]:expression |
+                 {div} [l]:expression [r]:expression |
+                 {mod} [l]:expression [r]:expression |
+                 {power} [l]:expression [r]:expression |
+                 {val} value |
+                 {max} value next_value+ |
+                 {min} value next_value+ |
+                 {subscription} identifier expression |
+                 {br_exps} expression next_expression* |
+                 {type} expression |
+                 {exp_par} expression |
+                 {exp_fc} function_call  |
+                 {open} [txt1]:expression [txt2]:expression |
+                 {var} identifier;
+
+    next_value = {nextv}value;
+
+    value = {val} identifier function_call |
+            {num}  number |
+            {str1} string |
+            {str2} string_simple |
+            {non} none;
+
+    number = {int}integer;
+
+    function_call = {fc}identifier arglist*;
+
+    arglist = {argl}expression next_expression*;
+
+    next_expression = {nexte}expression;
+
+    identifier = {idr}id;
